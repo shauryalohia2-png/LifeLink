@@ -1,0 +1,139 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String             @id @default(cuid())
+  name         String
+  email        String?            @unique
+  phone        String?            @unique
+  role         String             @default("REQUESTER")
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  appointments Appointment[]
+  requests     BloodRequest[]
+  organAppointments OrganAppointment[]
+}
+
+model OtpChallenge {
+  id          String   @id @default(cuid())
+  channel     String
+  destination String
+  name        String
+  codeHash    String?
+  provider    String   @default("LOCAL")
+  expiresAt   DateTime
+  attempts    Int      @default(0)
+  consumedAt  DateTime?
+  createdAt   DateTime @default(now())
+  @@index([destination, createdAt])
+}
+
+model BloodCentre {
+  id           String          @id @default(cuid())
+  name         String
+  address      String
+  city         String
+  state        String
+  postalCode   String?
+  latitude     Float?
+  longitude    Float?
+  phone        String
+  email        String?
+  verification String          @default("PENDING")
+  verifiedAt   DateTime?
+  inventory    Inventory[]
+  slots        DonationSlot[]
+  appointments Appointment[]
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  @@index([city, state])
+}
+
+model Inventory {
+  id             String      @id @default(cuid())
+  centreId       String
+  centre         BloodCentre @relation(fields: [centreId], references: [id], onDelete: Cascade)
+  bloodGroup     String
+  component      String      @default("Whole Blood")
+  units          Int
+  status         String      @default("AVAILABLE")
+  lastVerifiedAt DateTime
+  updatedById    String?
+  @@unique([centreId, bloodGroup, component])
+}
+
+model DonationSlot {
+  id         String        @id @default(cuid())
+  centreId   String
+  centre     BloodCentre   @relation(fields: [centreId], references: [id], onDelete: Cascade)
+  startsAt   DateTime
+  endsAt     DateTime
+  capacity   Int
+  bookedCount Int          @default(0)
+  isActive   Boolean       @default(true)
+  appointments Appointment[]
+  @@index([centreId, startsAt, isActive])
+}
+
+model Appointment {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id])
+  centreId  String
+  centre    BloodCentre  @relation(fields: [centreId], references: [id])
+  slotId    String
+  slot      DonationSlot @relation(fields: [slotId], references: [id])
+  status    String       @default("PENDING")
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+}
+
+model BloodRequest {
+  id              String   @id @default(cuid())
+  requesterId     String
+  requester       User     @relation(fields: [requesterId], references: [id])
+  bloodGroup      String
+  component       String   @default("Whole Blood")
+  units           Int
+  hospitalName    String
+  hospitalAddress String
+  urgency         String
+  status          String   @default("OPEN")
+  contactPhone    String
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model OrganAppointment {
+  id                   String   @id @default(cuid())
+  referenceCode        String   @unique
+  userId               String?
+  user                 User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  fullName             String
+  contact               String
+  email                 String?
+  topic                 String
+  preferredInstitution String?
+  requestedAt           DateTime
+  notes                 String?
+  status                String   @default("PENDING_REVIEW")
+  createdAt             DateTime @default(now())
+  @@index([contact, createdAt])
+}
+
+model AuditLog {
+  id          String   @id @default(cuid())
+  actorUserId String?
+  action      String
+  entityType  String
+  entityId    String
+  metadata    String?
+  createdAt   DateTime @default(now())
+  @@index([entityType, entityId, createdAt])
+}
